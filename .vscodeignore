@@ -6,4 +6,4 @@ out/**
 tsconfig.json
 esbuild.js
 *.vsix
-logo.png
+images/logo.png

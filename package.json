@@ -3,7 +3,8 @@
   "displayName": "EnvKeeper: Local Secret Vault",
   "description": "Never lose your API keys again. Automatically back up, encrypt (AES-256-GCM Envelope Encryption), and restore .env files linked to your Git repositories.",
   "version": "0.1.0",
-  "publisher": "local-dev",
+  "publisher": "swayamprabhu2005",
+  "author": "Swayam Kiran Prabhu",
   "license": "MIT",
   "icon": "images/icon.png",
   "repository": {
