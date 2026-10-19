@@ -1,0 +1,198 @@
+{
+  "name": "envkeeper",
+  "displayName": "EnvKeeper: Local Secret Vault",
+  "description": "Never lose your API keys again. Automatically back up, encrypt (AES-256-GCM Envelope Encryption), and restore .env files linked to your Git repositories.",
+  "version": "0.1.0",
+  "publisher": "local-dev",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/swayamprabhu2005/EnvKeeper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/swayamprabhu2005/EnvKeeper/issues"
+  },
+  "homepage": "https://github.com/swayamprabhu2005/EnvKeeper#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Security",
+    "Other"
+  ],
+  "keywords": [
+    "env",
+    "dotenv",
+    "secrets",
+    "encryption",
+    "backup",
+    "restore",
+    "api keys",
+    "vault"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "envKeeper.backup",
+        "title": "ENV Keeper: Backup Workspace .env Files",
+        "category": "ENV Keeper",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "envKeeper.restore",
+        "title": "ENV Keeper: Restore .env Files from Vault",
+        "category": "ENV Keeper",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "envKeeper.quickMenu",
+        "title": "ENV Keeper: Actions Menu",
+        "category": "ENV Keeper",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "envKeeper.manageMasterKey",
+        "title": "ENV Keeper: Set or Reset Master Passphrase",
+        "category": "ENV Keeper",
+        "icon": "$(key)"
+      },
+      {
+        "command": "envKeeper.lockVault",
+        "title": "ENV Keeper: Lock Vault (Clear Cached Passphrase)",
+        "category": "ENV Keeper",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "envKeeper.refreshView",
+        "title": "ENV Keeper: Refresh Vault Explorer",
+        "category": "ENV Keeper",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "envKeeper.deleteProjectVault",
+        "title": "ENV Keeper: Delete Project from Vault",
+        "category": "ENV Keeper",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "envKeeper.revealKeys",
+        "title": "ENV Keeper: View Encrypted Keys in Vault",
+        "category": "ENV Keeper",
+        "icon": "$(eye)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "env-keeper-container",
+          "title": "ENV Keeper",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "env-keeper-container": [
+        {
+          "id": "envKeeper.vaultView",
+          "name": "Vault Explorer",
+          "contextualTitle": "ENV Keeper"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "envKeeper.refreshView",
+          "when": "view == envKeeper.vaultView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "envKeeper.backup",
+          "when": "view == envKeeper.vaultView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "envKeeper.lockVault",
+          "when": "view == envKeeper.vaultView",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "envKeeper.restore",
+          "when": "view == envKeeper.vaultView && viewItem == project-vault",
+          "group": "inline@1"
+        },
+        {
+          "command": "envKeeper.revealKeys",
+          "when": "view == envKeeper.vaultView && viewItem == project-vault",
+          "group": "inline@2"
+        },
+        {
+          "command": "envKeeper.deleteProjectVault",
+          "when": "view == envKeeper.vaultView && viewItem == project-vault",
+          "group": "inline@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ENV Keeper",
+      "properties": {
+        "envKeeper.vaultPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path for the central encrypted vault folder. Defaults to ~/.envkeeper/vault on your machine."
+        },
+        "envKeeper.autoBackupOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically update the encrypted backup when any .env file is saved in the workspace."
+        },
+        "envKeeper.rememberMasterPassword": {
+          "type": "boolean",
+          "default": true,
+          "description": "Securely remember your Master Passphrase in OS Keychain (Windows Credential Manager) via VS Code SecretStorage."
+        },
+        "envKeeper.ignoredDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".next",
+            "out",
+            "venv",
+            ".venv",
+            "env",
+            "target",
+            "vendor"
+          ],
+          "description": "Folder names to ignore when scanning for .env files."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "node esbuild.js --production",
+    "test": "node --test out/test/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.3"
+  }
+}
