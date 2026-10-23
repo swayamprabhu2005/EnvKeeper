@@ -8,9 +8,25 @@ export class ScannerService {
   /**
    * Checks whether a filename matches the .env pattern.
    * Matches .env, .env.local, .env.production, .env.development, etc.
+   * Explicitly ignores template/sample/example/backup files (.example, .sample, .template, etc.).
    */
   public static isEnvFilename(filename: string): boolean {
-    const base = path.basename(filename);
+    const base = path.basename(filename).toLowerCase();
+
+    // Ignore non-secret template/sample/backup files
+    const ignoredExtensions = [
+      '.example',
+      '.sample',
+      '.template',
+      '.dist',
+      '.bak',
+      '.backup',
+      '.default'
+    ];
+    if (ignoredExtensions.some((ext) => base.endsWith(ext) || base.includes(ext))) {
+      return false;
+    }
+
     // Matches .env, .env.local, .env.dev, etc., or ends with .env (e.g. staging.env)
     return base === '.env' || base.startsWith('.env.') || base.endsWith('.env');
   }

@@ -75,4 +75,45 @@ describe('VaultService Per-Project Folder & Re-keying Tests', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  test('should preserve existing files non-destructively when backing up a subset of files', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-incremental-test-'));
+
+    try {
+      const vault = new VaultService(tmpDir);
+      const project: ProjectIdentity = {
+        projectId: 'github.com/swayan/incremental-demo',
+        projectName: 'incremental-demo',
+        gitRemoteUrl: 'https://github.com/swayan/incremental-demo.git',
+        isGitRepo: true
+      };
+
+      // 1. Initial backup has two files: .env and client/.env.local
+      vault.saveProjectBackup(
+        project,
+        [
+          { relativePath: '.env', content: 'KEY1=secret1\n' },
+          { relativePath: 'client/.env.local', content: 'KEY2=secret2\n' }
+        ],
+        masterPassphrase
+      );
+
+      // 2. Second backup only provides client/.env.local (e.g. .env was not touched or missing)
+      vault.saveProjectBackup(
+        project,
+        [{ relativePath: 'client/.env.local', content: 'KEY2=secret2_updated\n' }],
+        masterPassphrase
+      );
+
+      // 3. Verify .env is STILL present and restored
+      const loaded = vault.loadProjectBackup(project.projectId, masterPassphrase);
+      assert.strictEqual(loaded.files.length, 2);
+      const relPaths = loaded.files.map((f) => f.relativePath).sort();
+      assert.deepStrictEqual(relPaths, ['.env', 'client/.env.local']);
+      assert.ok(loaded.files.some((f) => f.content.includes('secret2_updated')));
+      assert.ok(loaded.files.some((f) => f.content.includes('secret1')));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

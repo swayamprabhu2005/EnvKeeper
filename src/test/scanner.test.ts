@@ -17,6 +17,14 @@ describe('ScannerService & DiffService Tests', () => {
     // Should not match regular files
     assert.strictEqual(ScannerService.isEnvFilename('environment.ts'), false);
     assert.strictEqual(ScannerService.isEnvFilename('.gitignore'), false);
+
+    // Should ignore non-secret template and sample files
+    assert.strictEqual(ScannerService.isEnvFilename('.env.example'), false);
+    assert.strictEqual(ScannerService.isEnvFilename('.env.sample'), false);
+    assert.strictEqual(ScannerService.isEnvFilename('.env.template'), false);
+    assert.strictEqual(ScannerService.isEnvFilename('.env.dist'), false);
+    assert.strictEqual(ScannerService.isEnvFilename('.env.bak'), false);
+    assert.strictEqual(ScannerService.isEnvFilename('.env.backup'), false);
   });
 
   test('scanWorkspace should find .env files and ignore node_modules', () => {

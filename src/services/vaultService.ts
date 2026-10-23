@@ -145,6 +145,7 @@ export class VaultService {
 
   /**
    * Retrieves metadata for a project backup without needing the decryption password.
+   * Also auto-recovers any orphaned .enc files on disk that may have been unindexed.
    */
   public getMetadata(projectId: string): ProjectVaultMeta | undefined {
     const metaFile = this.getProjectMetaFile(projectId);
@@ -153,7 +154,40 @@ export class VaultService {
     }
     try {
       const raw = fs.readFileSync(metaFile, 'utf8');
-      return JSON.parse(raw) as ProjectVaultMeta;
+      const meta = JSON.parse(raw) as ProjectVaultMeta;
+
+      // Auto-recover any orphaned .enc files on disk
+      const projectDir = this.getProjectDir(projectId);
+      if (fs.existsSync(projectDir)) {
+        let changed = false;
+        const diskEntries = fs.readdirSync(projectDir);
+        for (const filename of diskEntries) {
+          if (filename.endsWith('.enc')) {
+            const alreadyIndexed =
+              meta.files && meta.files.some((f) => f.vaultFileName === filename);
+            if (!alreadyIndexed) {
+              const relativePath =
+                filename === 'root.env.enc'
+                  ? '.env'
+                  : filename.slice(0, -4).replace(/__/g, '/');
+              meta.files = meta.files || [];
+              meta.files.push({
+                relativePath,
+                vaultFileName: filename,
+                keyNames: [],
+                updatedAt: new Date().toISOString()
+              });
+              changed = true;
+            }
+          }
+        }
+        if (changed) {
+          meta.fileCount = meta.files.length;
+          fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2), 'utf8');
+        }
+      }
+
+      return meta;
     } catch {
       return undefined;
     }
@@ -224,7 +258,16 @@ export class VaultService {
     const encryptedDek = CryptoService.encryptDek(dek, masterPassphrase);
 
     // 3. Encrypt each .env file with the DEK and write to disk
-    const fileMetaList: ProjectVaultMeta['files'] = [];
+    // Use a map to preserve existing backed up files non-destructively
+    const fileMap = new Map<string, ProjectVaultMeta['files'][0]>();
+    if (existingMeta && Array.isArray(existingMeta.files)) {
+      for (const f of existingMeta.files) {
+        const filePath = path.join(projectDir, f.vaultFileName);
+        if (fs.existsSync(filePath)) {
+          fileMap.set(f.relativePath, f);
+        }
+      }
+    }
 
     for (const file of files) {
       const vaultFileName = VaultService.toVaultFileName(file.relativePath);
@@ -233,13 +276,15 @@ export class VaultService {
 
       fs.writeFileSync(filePath, JSON.stringify(encryptedPayload, null, 2), 'utf8');
 
-      fileMetaList.push({
+      fileMap.set(file.relativePath, {
         relativePath: file.relativePath,
         vaultFileName,
         keyNames: CryptoService.extractKeyNames(file.content),
         updatedAt: new Date().toISOString()
       });
     }
+
+    const mergedFiles = Array.from(fileMap.values());
 
     // 4. Save project.meta.json
     const meta: ProjectVaultMeta = {
@@ -248,9 +293,9 @@ export class VaultService {
       projectName: project.projectName,
       gitRemoteUrl: project.gitRemoteUrl,
       lastBackedUp: new Date().toISOString(),
-      fileCount: files.length,
+      fileCount: mergedFiles.length,
       encryptedDek,
-      files: fileMetaList
+      files: mergedFiles
     };
 
     const metaFile = this.getProjectMetaFile(project.projectId);
@@ -283,6 +328,8 @@ export class VaultService {
 
     // 2. Decrypt each file using the DEK
     const files: EnvFileEntry[] = [];
+    let metaNeedsUpdate = false;
+
     for (const fileMeta of meta.files) {
       const filePath = path.join(projectDir, fileMeta.vaultFileName);
       if (fs.existsSync(filePath)) {
@@ -294,10 +341,21 @@ export class VaultService {
             relativePath: fileMeta.relativePath,
             content
           });
+
+          // Update key names if missing (e.g. from recovered orphan files)
+          if (!fileMeta.keyNames || fileMeta.keyNames.length === 0) {
+            fileMeta.keyNames = CryptoService.extractKeyNames(content);
+            metaNeedsUpdate = true;
+          }
         } catch {
           // ignore corrupted single file
         }
       }
+    }
+
+    if (metaNeedsUpdate) {
+      const metaFile = this.getProjectMetaFile(projectId);
+      fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2), 'utf8');
     }
 
     return { metadata: meta, files };

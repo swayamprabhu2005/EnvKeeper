@@ -2,7 +2,7 @@
   "name": "envkeeper",
   "displayName": "EnvKeeper: Local Secret Vault",
   "description": "Never lose your API keys again. Automatically back up, encrypt (AES-256-GCM Envelope Encryption), and restore .env files linked to your Git repositories.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "swayamprabhu2005",
   "author": "Swayam Kiran Prabhu",
   "license": "MIT",
@@ -91,7 +91,7 @@
         {
           "id": "env-keeper-container",
           "title": "ENV Keeper",
-          "icon": "$(shield)"
+          "icon": "images/shield.svg"
         }
       ]
     },
@@ -100,7 +100,8 @@
         {
           "id": "envKeeper.vaultView",
           "name": "Vault Explorer",
-          "contextualTitle": "ENV Keeper"
+          "contextualTitle": "ENV Keeper",
+          "when": "config.envKeeper.showActivityBarIcon"
         }
       ]
     },
@@ -146,7 +147,12 @@
         "envKeeper.vaultPath": {
           "type": "string",
           "default": "",
-          "description": "Custom path for the central encrypted vault folder. Defaults to ~/.envkeeper/vault on your machine."
+          "description": "Custom path for the central encrypted vault folder. Defaults to ~/Documents/env-keeper-vault on your machine."
+        },
+        "envKeeper.showActivityBarIcon": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the ENV Keeper Vault Explorer icon in the primary Activity Bar (left sidebar)."
         },
         "envKeeper.autoBackupOnSave": {
           "type": "boolean",
@@ -186,6 +192,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "build": "node esbuild.js --production",
+    "package": "vsce package --no-git-tag-version",
     "test": "node --test out/test/*.test.js"
   },
   "devDependencies": {

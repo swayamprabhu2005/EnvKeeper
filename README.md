@@ -126,6 +126,7 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) and type `EnvKeeper`:
 | Setting | Type | Default | Description |
 |---|---|---|---|
 | `envKeeper.vaultPath` | `string` | `""` | Custom storage folder path (defaults to `~/Documents/env-keeper-vault`) |
+| `envKeeper.showActivityBarIcon` | `boolean` | `true` | Show or hide the ENV Keeper Vault Explorer icon in the primary Activity Bar (left sidebar) |
 | `envKeeper.autoBackupOnSave` | `boolean` | `false` | Automatically update vault backup whenever an `.env` file is saved |
 | `envKeeper.rememberMasterPassword` | `boolean` | `true` | Securely remember Master Passphrase in OS Keychain |
 | `envKeeper.ignoredDirectories` | `array` | `["node_modules", ".git", ...]` | Folder names to exclude during workspace scan |

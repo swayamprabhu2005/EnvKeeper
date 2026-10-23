@@ -44,34 +44,48 @@ export class StatusBarManager {
 
     this.statusBarItem.backgroundColor = undefined;
 
-    if (localEnvFiles.length > 0) {
-      if (hasVaultBackup && metadata) {
-        // Check if file count or file paths match
-        const sameFileCount = metadata.fileCount === localEnvFiles.length;
-        if (sameFileCount) {
-          this.statusBarItem.text = '$(check) ENV Protected';
-          this.statusBarItem.tooltip = `ENV Keeper: ${localEnvFiles.length} env file(s) backed up for ${projectIdentity.projectName}\nLast backup: ${new Date(metadata.lastBackedUp).toLocaleString()}`;
-          this.statusBarItem.command = 'envKeeper.quickMenu';
-        } else {
-          this.statusBarItem.text = `$(shield) Backup ENV (${localEnvFiles.length})`;
-          this.statusBarItem.tooltip = `ENV Keeper: Changes detected in env files. Click to update backup.`;
-          this.statusBarItem.command = 'envKeeper.backup';
-        }
-      } else {
-        // Local env exists, never backed up yet!
-        this.statusBarItem.text = `$(shield) Backup ENV (${localEnvFiles.length})`;
-        this.statusBarItem.tooltip = `ENV Keeper: Found ${localEnvFiles.length} env file(s) in project. Click to encrypt and save backup!`;
-        this.statusBarItem.command = 'envKeeper.backup';
-      }
-    } else if (hasVaultBackup && metadata) {
-      // Re-cloned project! No local .env, but backup is waiting in vault!
-      const totalKeys = metadata.files.reduce((acc, f) => acc + f.keyNames.length, 0);
-      this.statusBarItem.text = '$(cloud-download) Restore ENV';
-      this.statusBarItem.tooltip = `ENV Keeper: Backup found in vault with ${metadata.fileCount} file(s) (${totalKeys} keys). Click to restore!`;
-      this.statusBarItem.backgroundColor = new vscode.ThemeColor(
-        'statusBarItem.warningBackground'
+    if (hasVaultBackup && metadata) {
+      const missingFiles = metadata.files.filter(
+        (vf) => !localEnvFiles.some((lf) => lf.relativePath === vf.relativePath)
       );
-      this.statusBarItem.command = 'envKeeper.restore';
+
+      if (localEnvFiles.length === 0) {
+        // Re-cloned project or all env files deleted: restore from vault
+        const totalKeys = metadata.files.reduce(
+          (acc, f) => acc + (f.keyNames ? f.keyNames.length : 0),
+          0
+        );
+        this.statusBarItem.text = '$(cloud-download) Restore ENV';
+        this.statusBarItem.tooltip = `ENV Keeper: Backup found in vault with ${metadata.fileCount} file(s) (${totalKeys} keys). Click to restore!`;
+        this.statusBarItem.backgroundColor = new vscode.ThemeColor(
+          'statusBarItem.warningBackground'
+        );
+        this.statusBarItem.command = 'envKeeper.restore';
+      } else if (missingFiles.length > 0) {
+        // Some local files present, but 1 or more vaulted files are missing!
+        const missingNames = missingFiles.map((f) => f.relativePath).join(', ');
+        this.statusBarItem.text = `$(cloud-download) Restore Missing ENV (${missingFiles.length})`;
+        this.statusBarItem.tooltip = `ENV Keeper: ${missingFiles.length} file(s) from vault are missing locally (${missingNames}). Click to restore!`;
+        this.statusBarItem.backgroundColor = new vscode.ThemeColor(
+          'statusBarItem.warningBackground'
+        );
+        this.statusBarItem.command = 'envKeeper.restore';
+      } else if (localEnvFiles.length > metadata.files.length) {
+        // Additional local env files found that are not in vault
+        this.statusBarItem.text = `$(shield) Backup New ENV (${localEnvFiles.length})`;
+        this.statusBarItem.tooltip = `ENV Keeper: New local environment files detected. Click to update vault!`;
+        this.statusBarItem.command = 'envKeeper.backup';
+      } else {
+        // All vaulted files are present locally and protected
+        this.statusBarItem.text = '$(check) ENV Protected';
+        this.statusBarItem.tooltip = `ENV Keeper: ${localEnvFiles.length} env file(s) backed up for ${projectIdentity.projectName}\nLast backup: ${new Date(metadata.lastBackedUp).toLocaleString()}`;
+        this.statusBarItem.command = 'envKeeper.quickMenu';
+      }
+    } else if (localEnvFiles.length > 0) {
+      // Local env exists, never backed up yet!
+      this.statusBarItem.text = `$(shield) Backup ENV (${localEnvFiles.length})`;
+      this.statusBarItem.tooltip = `ENV Keeper: Found ${localEnvFiles.length} env file(s) in project. Click to encrypt and save backup!`;
+      this.statusBarItem.command = 'envKeeper.backup';
     } else {
       // No local .env, no backup
       this.statusBarItem.text = '$(shield) ENV Keeper';

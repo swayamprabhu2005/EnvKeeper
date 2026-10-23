@@ -237,6 +237,19 @@ export function activate(context: vscode.ExtensionContext) {
         description: vaultService.getVaultDirectory()
       });
 
+      const showActivityBar = vscode.workspace
+        .getConfiguration('envKeeper')
+        .get<boolean>('showActivityBarIcon', true);
+
+      items.push({
+        label: showActivityBar
+          ? '$(eye-closed) Hide Activity Bar Sidebar Icon'
+          : '$(eye) Show Activity Bar Sidebar Icon',
+        description: showActivityBar
+          ? 'Currently visible in left sidebar (Click to hide)'
+          : 'Currently hidden from left sidebar (Click to show)'
+      });
+
       items.push({
         label: '$(gear) Configure Settings',
         description: 'Change vault location or auto-backup preferences'
@@ -261,6 +274,20 @@ export function activate(context: vscode.ExtensionContext) {
       } else if (selected.label.includes('Open Vault Folder')) {
         const vaultDir = vaultService.getVaultDirectory();
         await vscode.env.openExternal(vscode.Uri.file(vaultDir));
+      } else if (selected.label.includes('Activity Bar Sidebar Icon')) {
+        const currentVal = vscode.workspace
+          .getConfiguration('envKeeper')
+          .get<boolean>('showActivityBarIcon', true);
+        await vscode.workspace
+          .getConfiguration('envKeeper')
+          .update(
+            'showActivityBarIcon',
+            !currentVal,
+            vscode.ConfigurationTarget.Global
+          );
+        vscode.window.showInformationMessage(
+          `ENV Keeper: Sidebar Activity Bar icon ${!currentVal ? 'enabled' : 'disabled'}.`
+        );
       } else if (selected.label.includes('Configure Settings')) {
         await vscode.commands.executeCommand(
           'workbench.action.openSettings',
@@ -442,11 +469,13 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Watch for document saves (for auto-backup and status bar update)
+  // Watch for document saves (for change-detection notification and auto-backup)
+  let lastPromptTime = 0;
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (doc) => {
       const fileName = path.basename(doc.fileName);
       if (ScannerService.isEnvFilename(fileName)) {
+        const root = getWorkspaceRoot();
         const autoBackup = vscode.workspace
           .getConfiguration('envKeeper')
           .get<boolean>('autoBackupOnSave', false);
@@ -455,6 +484,39 @@ export function activate(context: vscode.ExtensionContext) {
           const passphrase = await keyManager.getPassphrase(false);
           if (passphrase) {
             await vscode.commands.executeCommand('envKeeper.backup');
+          }
+        } else if (root) {
+          // If autoBackup is false, notify user of detected changes
+          const project = GitService.getProjectIdentity(root);
+          if (vaultService.hasBackup(project.projectId)) {
+            const now = Date.now();
+            if (now - lastPromptTime > 5000) {
+              lastPromptTime = now;
+              vscode.window
+                .showInformationMessage(
+                  `ENV Keeper: Changes saved in "${fileName}" for "${project.projectName}". Update encrypted vault backup?`,
+                  'Update Backup',
+                  'Always Auto-Backup',
+                  'Dismiss'
+                )
+                .then(async (action) => {
+                  if (action === 'Update Backup') {
+                    await vscode.commands.executeCommand('envKeeper.backup');
+                  } else if (action === 'Always Auto-Backup') {
+                    await vscode.workspace
+                      .getConfiguration('envKeeper')
+                      .update(
+                        'autoBackupOnSave',
+                        true,
+                        vscode.ConfigurationTarget.Global
+                      );
+                    await vscode.commands.executeCommand('envKeeper.backup');
+                    vscode.window.showInformationMessage(
+                      'ENV Keeper: Auto-backup on save enabled! Future saves will back up automatically.'
+                    );
+                  }
+                });
+            }
           }
         }
         await updateUi();
@@ -474,6 +536,66 @@ export function activate(context: vscode.ExtensionContext) {
       }
     })
   );
+
+  // First-Run Onboarding Guide
+  const ONBOARDING_KEY = 'envKeeper.onboardingCompleted_v1';
+  const hasOnboarded = context.globalState.get<boolean>(ONBOARDING_KEY, false);
+
+  if (!hasOnboarded) {
+    const configPath = vscode.workspace
+      .getConfiguration('envKeeper')
+      .get<string>('vaultPath');
+
+    keyManager.hasSavedPassphrase().then((hasSavedPass) => {
+      if (!configPath && !hasSavedPass) {
+        vscode.window
+          .showInformationMessage(
+            '🛡️ Welcome to ENV Keeper! Would you like to set up your encrypted vault location and Master Passphrase?',
+            'Quick Setup (Default)',
+            'Choose Custom Folder...',
+            'Configure Later'
+          )
+          .then(async (choice) => {
+            await context.globalState.update(ONBOARDING_KEY, true);
+
+            if (choice === 'Quick Setup (Default)') {
+              vaultService.ensureVaultDir();
+              await keyManager.setupNewPassphrase();
+              vscode.window.showInformationMessage(
+                `ENV Keeper is ready! Your vault is set to "${vaultService.getVaultDirectory()}". Use the shield icon in the status bar anytime.`
+              );
+            } else if (choice === 'Choose Custom Folder...') {
+              const selectedUri = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Vault Folder',
+                title: 'Choose ENV Keeper Vault Directory'
+              });
+
+              if (selectedUri && selectedUri[0]) {
+                await vscode.workspace
+                  .getConfiguration('envKeeper')
+                  .update(
+                    'vaultPath',
+                    selectedUri[0].fsPath,
+                    vscode.ConfigurationTarget.Global
+                  );
+                vaultService.setCustomVaultPath(selectedUri[0].fsPath);
+                vaultService.ensureVaultDir();
+                await keyManager.setupNewPassphrase();
+                vscode.window.showInformationMessage(
+                  `ENV Keeper: Vault directory set to "${selectedUri[0].fsPath}". Master Passphrase configured!`
+                );
+              }
+            }
+            await updateUi();
+          });
+      } else {
+        context.globalState.update(ONBOARDING_KEY, true);
+      }
+    });
+  }
 
   // Initial update
   updateUi();
