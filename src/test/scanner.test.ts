@@ -67,4 +67,51 @@ describe('ScannerService & DiffService Tests', () => {
     // Missing key from backup should be added
     assert.ok(merged.includes('GROQ_API_KEY=gsk_new_groq_key'));
   });
+
+  test('scanWorkspaceDetailed should isolate nested Git repositories and identify them', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'envkeeper-test-subrepo-'));
+
+    try {
+      // 1. Root .env
+      fs.writeFileSync(path.join(tmpDir, '.env'), 'ROOT=TRUE\n');
+
+      // 2. Normal monorepo package (no .git) -> SHOULD be scanned
+      const pkgDir = path.join(tmpDir, 'packages', 'client');
+      fs.mkdirSync(pkgDir, { recursive: true });
+      fs.writeFileSync(path.join(pkgDir, '.env'), 'CLIENT=TRUE\n');
+
+      // 3. Nested Git repository with .git directory (e.g. interior design) -> SHOULD be isolated
+      const subRepoDir = path.join(tmpDir, 'interior design');
+      const subRepoGit = path.join(subRepoDir, '.git');
+      fs.mkdirSync(subRepoGit, { recursive: true });
+      fs.writeFileSync(path.join(subRepoDir, '.env'), 'INTERIOR=TRUE\n');
+      const subNested = path.join(subRepoDir, 'backend');
+      fs.mkdirSync(subNested, { recursive: true });
+      fs.writeFileSync(path.join(subNested, '.env'), 'INTERIOR_BACKEND=TRUE\n');
+
+      // 4. Submodule with .git file -> SHOULD be isolated
+      const submoduleDir = path.join(tmpDir, 'submodules', 'shared-lib');
+      fs.mkdirSync(submoduleDir, { recursive: true });
+      fs.writeFileSync(path.join(submoduleDir, '.git'), 'gitdir: ../../.git/modules/shared-lib\n');
+      fs.writeFileSync(path.join(submoduleDir, '.env'), 'SUBMODULE=TRUE\n');
+
+      // Test default: ignoreSubRepositories = true
+      const detailed = ScannerService.scanWorkspaceDetailed(tmpDir, [], true);
+      const scannedPaths = detailed.files.map((f) => f.relativePath);
+
+      // Only root and regular package files should be present
+      assert.deepStrictEqual(scannedPaths, ['.env', 'packages/client/.env']);
+      // Both the nested directory and submodule should be reported in skippedSubRepos
+      assert.deepStrictEqual(detailed.skippedSubRepos, ['interior design', 'submodules/shared-lib']);
+
+      // Test when ignoreSubRepositories = false
+      const allFound = ScannerService.scanWorkspace(tmpDir, [], false);
+      const allPaths = allFound.map((f) => f.relativePath);
+      assert.ok(allPaths.includes('interior design/.env'));
+      assert.ok(allPaths.includes('interior design/backend/.env'));
+      assert.ok(allPaths.includes('submodules/shared-lib/.env'));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

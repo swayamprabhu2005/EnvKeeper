@@ -30,12 +30,14 @@ export class StatusBarManager {
 
     const config = vscode.workspace.getConfiguration('envKeeper');
     const ignored = config.get<string[]>('ignoredDirectories', []);
+    const ignoreSubRepos = config.get<boolean>('ignoreSubRepositories', true);
 
     const projectIdentity: ProjectIdentity =
       GitService.getProjectIdentity(activeWorkspaceRoot);
     const localEnvFiles = ScannerService.scanWorkspace(
       activeWorkspaceRoot,
-      ignored
+      ignored,
+      ignoreSubRepos
     );
     const hasVaultBackup = this.vaultService.hasBackup(projectIdentity.projectId);
     const metadata = hasVaultBackup

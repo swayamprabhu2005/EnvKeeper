@@ -157,9 +157,11 @@ export class VaultTreeDataProvider
 
     const config = vscode.workspace.getConfiguration('envKeeper');
     const ignored = config.get<string[]>('ignoredDirectories', []);
+    const ignoreSubRepos = config.get<boolean>('ignoreSubRepositories', true);
 
     const project = GitService.getProjectIdentity(root);
-    const localFiles = ScannerService.scanWorkspace(root, ignored);
+    const { files: localFiles, skippedSubRepos } =
+      ScannerService.scanWorkspaceDetailed(root, ignored, ignoreSubRepos);
     const hasBackup = this.vaultService.hasBackup(project.projectId);
     const metadata = hasBackup
       ? this.vaultService.getMetadata(project.projectId)
@@ -210,6 +212,20 @@ export class VaultTreeDataProvider
           )
         );
       }
+    }
+
+    if (skippedSubRepos.length > 0) {
+      const subRepoLabel =
+        skippedSubRepos.length === 1
+          ? `Isolated Git Sub-repo: ${skippedSubRepos[0]}`
+          : `${skippedSubRepos.length} Nested Git Sub-repos Isolated`;
+      const subRepoItem = new VaultTreeItem(
+        subRepoLabel,
+        vscode.TreeItemCollapsibleState.None,
+        'info'
+      );
+      subRepoItem.tooltip = `Nested Git repo(s): ${skippedSubRepos.join(', ')}\nTheir .env files are kept isolated from this workspace backup. Open each sub-repository directly in VS Code to manage its keys.`;
+      items.push(subRepoItem);
     }
 
     return items;

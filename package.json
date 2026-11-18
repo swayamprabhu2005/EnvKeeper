@@ -2,7 +2,7 @@
   "name": "envkeeper",
   "displayName": "EnvKeeper: Local Secret Vault",
   "description": "Never lose your API keys again. Automatically back up, encrypt (AES-256-GCM Envelope Encryption), and restore .env files linked to your Git repositories.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "swayamprabhu2005",
   "author": "Swayam Kiran Prabhu",
   "license": "MIT",
@@ -163,6 +163,11 @@
           "type": "boolean",
           "default": true,
           "description": "Securely remember your Master Passphrase in OS Keychain (Windows Credential Manager) via VS Code SecretStorage."
+        },
+        "envKeeper.ignoreSubRepositories": {
+          "type": "boolean",
+          "default": true,
+          "description": "Isolate nested Git repositories (sub-folders containing their own .git) so their .env files are not bundled into the parent workspace backup."
         },
         "envKeeper.ignoredDirectories": {
           "type": "array",

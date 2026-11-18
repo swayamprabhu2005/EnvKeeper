@@ -2,6 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { EnvFileEntry } from '../types';
 
+export interface WorkspaceScanResult {
+  files: EnvFileEntry[];
+  skippedSubRepos: string[];
+}
+
 export class ScannerService {
   private static readonly MAX_FILE_SIZE_BYTES = 1024 * 1024; // 1MB limit for env files
 
@@ -32,13 +37,25 @@ export class ScannerService {
   }
 
   /**
-   * Recursively scans a workspace directory for all .env* files.
-   * Excludes folders in ignoredDirs.
+   * Checks whether a directory is a Git repository (has .git directory or submodule .git file).
    */
-  public static scanWorkspace(
+  public static isGitRepository(dirPath: string): boolean {
+    const gitPath = path.join(dirPath, '.git');
+    try {
+      return fs.existsSync(gitPath);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Detailed scan returning both detected env files and any skipped nested Git repositories.
+   */
+  public static scanWorkspaceDetailed(
     workspaceRoot: string,
-    ignoredDirs: string[] = []
-  ): EnvFileEntry[] {
+    ignoredDirs: string[] = [],
+    ignoreSubRepositories: boolean = true
+  ): WorkspaceScanResult {
     const defaultIgnored = new Set([
       'node_modules',
       '.git',
@@ -55,7 +72,9 @@ export class ScannerService {
     ]);
 
     const results: EnvFileEntry[] = [];
+    const skippedSubRepos: string[] = [];
     const queue: string[] = [workspaceRoot];
+    const resolvedRoot = path.resolve(workspaceRoot);
 
     while (queue.length > 0) {
       const currentDir = queue.shift()!;
@@ -73,6 +92,19 @@ export class ScannerService {
 
         if (entry.isDirectory()) {
           if (!defaultIgnored.has(entry.name) && !entry.name.startsWith('.')) {
+            // Check if this subdirectory is its own Git repository (sub-repo boundary)
+            if (
+              ignoreSubRepositories &&
+              path.resolve(fullPath) !== resolvedRoot &&
+              this.isGitRepository(fullPath)
+            ) {
+              const relSubRepo = path
+                .relative(workspaceRoot, fullPath)
+                .replace(/\\/g, '/');
+              skippedSubRepos.push(relSubRepo);
+              continue; // Do not traverse into nested Git repository!
+            }
+
             queue.push(fullPath);
           }
         } else if (entry.isFile() && this.isEnvFilename(entry.name)) {
@@ -93,7 +125,26 @@ export class ScannerService {
     }
 
     // Sort entries alphabetically by relative path
-    return results.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+    results.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+    skippedSubRepos.sort((a, b) => a.localeCompare(b));
+
+    return { files: results, skippedSubRepos };
+  }
+
+  /**
+   * Recursively scans a workspace directory for all .env* files.
+   * Excludes folders in ignoredDirs and optionally isolates nested Git repositories.
+   */
+  public static scanWorkspace(
+    workspaceRoot: string,
+    ignoredDirs: string[] = [],
+    ignoreSubRepositories: boolean = true
+  ): EnvFileEntry[] {
+    return this.scanWorkspaceDetailed(
+      workspaceRoot,
+      ignoredDirs,
+      ignoreSubRepositories
+    ).files;
   }
 
   /**
@@ -101,9 +152,14 @@ export class ScannerService {
    */
   public static hasEnvFiles(
     workspaceRoot: string,
-    ignoredDirs: string[] = []
+    ignoredDirs: string[] = [],
+    ignoreSubRepositories: boolean = true
   ): boolean {
-    const files = this.scanWorkspace(workspaceRoot, ignoredDirs);
+    const files = this.scanWorkspace(
+      workspaceRoot,
+      ignoredDirs,
+      ignoreSubRepositories
+    );
     return files.length > 0;
   }
 }

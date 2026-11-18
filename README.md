@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com"><img src="https://img.shields.io/badge/VS%20Code%20Marketplace-v0.1.0-blue.svg?style=flat-square&logo=visual-studio-code" alt="Marketplace" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=swayamprabhu2005.envkeeper"><img src="https://img.shields.io/badge/VS%20Code%20Marketplace-v0.2.1-blue.svg?style=flat-square&logo=visual-studio-code" alt="Marketplace" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License" /></a>
   <a href="#-security-architecture"><img src="https://img.shields.io/badge/Security-AES--256--GCM%20Envelope-orange.svg?style=flat-square" alt="Security" /></a>
   <a href="GUIDE.md"><img src="https://img.shields.io/badge/User%20Guide-Interactive%20Walkthrough-purple.svg?style=flat-square&logo=gitbook" alt="User Guide" /></a>
@@ -44,6 +44,7 @@ When building modern applications with AI APIs (like **Google Gemini**, **Groq**
   * The DEK is encrypted with a **Key Encryption Key (KEK)** derived from your Master Passphrase using **PBKDF2 (100,000 iterations + SHA-512)**.
   * Re-keying or changing passphrases is instant because files never need to be decrypted.
 * 🗄️ **Google Password Manager & OS Keychain Integration**: Master Passphrase is encrypted in **Windows Credential Manager / macOS Keychain** via VS Code's `SecretStorage`. Includes a 1-click **Copy to Clipboard** button to save it in Google Password Manager, Bitwarden, or 1Password.
+* 🛡️ **Sub-Repository & Nested Project Isolation**: Opening parent directories containing multiple projects safely isolates sub-repositories (folders with their own `.git` or submodules). Their environment files are never leaked into the parent workspace backup.
 * 🛡️ **Smart Collision Guard**: If restoring into a project with existing `.env` files, choose between **View Diff** (side-by-side in VS Code), **Merge Missing Keys**, or **Overwrite with Vault**.
 * 🌳 **Activity Bar Explorer**: Inspect vaulted projects, view variable names without decrypting, preview secrets safely, or delete old vaults.
 
@@ -129,15 +130,20 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) and type `EnvKeeper`:
 | `envKeeper.showActivityBarIcon` | `boolean` | `true` | Show or hide the ENV Keeper Vault Explorer icon in the primary Activity Bar (left sidebar) |
 | `envKeeper.autoBackupOnSave` | `boolean` | `false` | Automatically update vault backup whenever an `.env` file is saved |
 | `envKeeper.rememberMasterPassword` | `boolean` | `true` | Securely remember Master Passphrase in OS Keychain |
+| `envKeeper.ignoreSubRepositories` | `boolean` | `true` | Automatically isolate nested Git repositories (sub-folders containing `.git`) to prevent redundant root backups |
 | `envKeeper.ignoredDirectories` | `array` | `["node_modules", ".git", ...]` | Folder names to exclude during workspace scan |
 
 ---
 
 ## 📦 Installation
 
-Install directly from the VS Code Marketplace or via terminal:
+Install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=swayamprabhu2005.envkeeper) or via terminal:
 ```bash
-code --install-extension envkeeper-0.1.0.vsix
+code --install-extension swayamprabhu2005.envkeeper
+```
+Or with a packaged VSIX:
+```bash
+code --install-extension envkeeper-0.2.1.vsix
 ```
 
 ---

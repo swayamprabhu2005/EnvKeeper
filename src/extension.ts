@@ -71,7 +71,14 @@ export function activate(context: vscode.ExtensionContext) {
       const ignored = vscode.workspace
         .getConfiguration('envKeeper')
         .get<string[]>('ignoredDirectories', []);
-      const localFiles = ScannerService.scanWorkspace(root, ignored);
+      const ignoreSubRepos = vscode.workspace
+        .getConfiguration('envKeeper')
+        .get<boolean>('ignoreSubRepositories', true);
+      const localFiles = ScannerService.scanWorkspace(
+        root,
+        ignored,
+        ignoreSubRepos
+      );
 
       if (localFiles.length === 0) {
         vscode.window.showInformationMessage(
@@ -197,8 +204,11 @@ export function activate(context: vscode.ExtensionContext) {
       const ignored = vscode.workspace
         .getConfiguration('envKeeper')
         .get<string[]>('ignoredDirectories', []);
+      const ignoreSubRepos = vscode.workspace
+        .getConfiguration('envKeeper')
+        .get<boolean>('ignoreSubRepositories', true);
       const localFiles = root
-        ? ScannerService.scanWorkspace(root, ignored)
+        ? ScannerService.scanWorkspace(root, ignored, ignoreSubRepos)
         : [];
       const hasBackup = project
         ? vaultService.hasBackup(project.projectId)
@@ -476,6 +486,32 @@ export function activate(context: vscode.ExtensionContext) {
       const fileName = path.basename(doc.fileName);
       if (ScannerService.isEnvFilename(fileName)) {
         const root = getWorkspaceRoot();
+        if (!root) {
+          return;
+        }
+
+        const ignored = vscode.workspace
+          .getConfiguration('envKeeper')
+          .get<string[]>('ignoredDirectories', []);
+        const ignoreSubRepos = vscode.workspace
+          .getConfiguration('envKeeper')
+          .get<boolean>('ignoreSubRepositories', true);
+        const localFiles = ScannerService.scanWorkspace(
+          root,
+          ignored,
+          ignoreSubRepos
+        );
+
+        // Verify the saved file is part of this workspace project (not an isolated sub-repository)
+        const resolvedDoc = path.resolve(doc.fileName).toLowerCase();
+        const belongsToProject = localFiles.some(
+          (f) => path.resolve(root, f.relativePath).toLowerCase() === resolvedDoc
+        );
+
+        if (!belongsToProject) {
+          return;
+        }
+
         const autoBackup = vscode.workspace
           .getConfiguration('envKeeper')
           .get<boolean>('autoBackupOnSave', false);
@@ -485,7 +521,7 @@ export function activate(context: vscode.ExtensionContext) {
           if (passphrase) {
             await vscode.commands.executeCommand('envKeeper.backup');
           }
-        } else if (root) {
+        } else {
           // If autoBackup is false, notify user of detected changes
           const project = GitService.getProjectIdentity(root);
           if (vaultService.hasBackup(project.projectId)) {
